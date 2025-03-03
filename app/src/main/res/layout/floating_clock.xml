@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/circle_background"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="12dp">
+
+    <TextView
+        android:id="@+id/clock_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxWidth="150dp"
+        android:minWidth="50dp"
+        android:singleLine="true"
+        android:textColor="@android:color/white"
+        android:textSize="15sp"
+        tools:text="做点什么" />
+
+    <TextView
+        android:id="@+id/close_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="关闭"
+        android:textColor="@color/c_cccccc"
+        android:textSize="12sp" />
+
+</LinearLayout>

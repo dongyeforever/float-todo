@@ -1,0 +1,42 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+*.iml
+
+# original file saved after performing a merge in git
+*.orig
+
+buildtools/mapping.txt
+buildtools/seeds.txt
+buildtools/usage.txt
+.DS_Store
+
+### Android freeline files2 ###
+freeline/
+freeline_core
+freeline.py
+freeline_project_description.json
+
+rocoofix/
+Users/
+*.local_bak
+1.json
+*/schemas
+/deps.txt
+/deps2.txt
+
+# idea
+.idea
