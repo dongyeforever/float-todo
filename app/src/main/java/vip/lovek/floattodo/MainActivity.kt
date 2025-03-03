@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.view.View.OnLongClickListener
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
@@ -50,6 +52,11 @@ class MainActivity : AppCompatActivity() {
         }
         binding.tvLogo.setOnClickListener {
             requestOverlayPermission()
+        }
+
+        binding.tvLogo.setOnLongClickListener {
+            showDeleteDialog()
+            true
         }
 
         todoViewModel.getSortLiveData().observe(this, sortObserver)
@@ -98,6 +105,27 @@ class MainActivity : AppCompatActivity() {
         } else {
             startFloatingClockService()
         }
+    }
+
+    private fun showDeleteDialog() {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("提示")
+        builder.setMessage("删除所有已完成 todo？")
+        builder.setPositiveButton("确定") { dialog, _ ->
+            dialog.dismiss()
+            CoroutineScope(Dispatchers.IO).launch {
+                todoDao.deleteAllCompletedTodos()
+                withContext(Dispatchers.Main) {
+                    loadTodosFromDatabase()
+                }
+            }
+        }
+        // 设置取消按钮及其点击事件
+        builder.setNegativeButton("取消") { dialog, _ ->
+            dialog.dismiss()
+        }
+        val dialog = builder.create()
+        dialog.show()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

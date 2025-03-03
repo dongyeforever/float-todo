@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.KeyEvent
-import android.widget.CompoundButton
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -36,7 +35,7 @@ class EditTodoActivity : AppCompatActivity() {
             reminderTime = it.reminderTime
             val calendar = Calendar.getInstance()
             calendar.timeInMillis = it.reminderTime
-            binding.tvSetReminder.text = formatToHourMinute(it.reminderTime)
+            binding.tvSetReminder.text = if (it.reminderTime > 0) formatToHourMinute(it.reminderTime) else ""
         }
 
         initListener()
@@ -75,11 +74,7 @@ class EditTodoActivity : AppCompatActivity() {
             }
         })
 
-        binding.importantCheckBox.setOnCheckedChangeListener(object : CompoundButton.OnCheckedChangeListener {
-            override fun onCheckedChanged(buttonView: CompoundButton?, isChecked: Boolean) {
-                setSaveEnable(hasTodoChanged())
-            }
-        })
+        binding.importantCheckBox.setOnCheckedChangeListener { _, _ -> setSaveEnable(hasTodoChanged()) }
     }
 
     private fun onBackClick() {
@@ -131,12 +126,12 @@ class EditTodoActivity : AppCompatActivity() {
         val builder = AlertDialog.Builder(this)
         builder.setTitle("提示")
         builder.setMessage("信息未保存，是否返回？")
-        builder.setPositiveButton("确定") { dialog, which ->
+        builder.setPositiveButton("确定") { dialog, _ ->
             dialog.dismiss()
             finish()
         }
         // 设置取消按钮及其点击事件
-        builder.setNegativeButton("取消") { dialog, which ->
+        builder.setNegativeButton("取消") { dialog, _ ->
             dialog.dismiss()
         }
 

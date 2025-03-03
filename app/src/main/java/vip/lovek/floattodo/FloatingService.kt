@@ -1,6 +1,7 @@
 package vip.lovek.floattodo
 
 import android.animation.ObjectAnimator
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vip.lovek.floattodo.dao.TodoDatabase
 import vip.lovek.floattodo.model.Todo
+import vip.lovek.floattodo.util.ActivityUtil
 import vip.lovek.floattodo.util.DisplayUtil
 import vip.lovek.floattodo.util.TimeUtils
 import java.time.ZoneId
@@ -129,6 +131,7 @@ class FloatingService : Service() {
     }
 
     private fun goMainActivity() {
+        if (ActivityUtil.isAppTop()) return
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -183,12 +186,16 @@ class FloatingService : Service() {
                 }
                 val todo = todos[0]
                 CoroutineScope(Dispatchers.Main).launch {
-                    clockTextView.text = todo.title
-                    if (TimeUtils.isInCurrentMinute(todo.reminderTime)) {
-                        // 构造通知
-                        sendNotification(todo)
-                        // 动画提醒
-                        startAnimation()
+                    if (todo.isCompleted) {
+                        floatingView.visibility = View.GONE
+                    } else {
+                        clockTextView.text = todo.title
+                        if (TimeUtils.isInCurrentMinute(todo.reminderTime)) {
+                            // 构造通知
+                            sendNotification(todo)
+                            // 动画提醒
+                            startAnimation()
+                        }
                     }
                 }
             } else {
@@ -221,6 +228,7 @@ class FloatingService : Service() {
 
     // 发送通知
     private fun sendNotification(todo: Todo) {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // 创建一个 Intent 用于打开某个 Activity
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -231,11 +239,14 @@ class FloatingService : Service() {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_ID, NotificationManager.IMPORTANCE_HIGH)
+        channel.setShowBadge(true)
+        notificationManager.createNotificationChannel(channel)
 
         // 构建通知
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("您有一个代办需要现在处理")
+            .setContentTitle("您有代办需要现在处理")
             .setContentText(todo.title)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
@@ -243,7 +254,6 @@ class FloatingService : Service() {
             .build()
 
         // 发送通知
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
