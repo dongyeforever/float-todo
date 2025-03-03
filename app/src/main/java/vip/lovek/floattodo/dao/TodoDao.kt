@@ -9,7 +9,7 @@ import vip.lovek.floattodo.model.Todo
 
 @Dao
 interface TodoDao {
-    @Query("SELECT * FROM todo_table ORDER BY isCompleted ASC, id DESC")
+    @Query("SELECT * FROM todo_table ORDER BY isCompleted ASC, reminderTime DESC, id DESC")
     fun getAllTodos(): List<Todo>
 
     @Insert

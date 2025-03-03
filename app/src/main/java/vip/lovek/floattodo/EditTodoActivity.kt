@@ -101,7 +101,7 @@ class EditTodoActivity : AppCompatActivity() {
                 setSaveEnable(hasTodoChanged())
 
                 setAlarm(reminderTime)
-                Toast.makeText(this, "提醒时间已设置", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "提醒时间已设置，别忘了保存", Toast.LENGTH_SHORT).show()
             },
             hour,
             minute,
@@ -192,7 +192,7 @@ class EditTodoActivity : AppCompatActivity() {
     private fun setSaveEnable(enable: Boolean) {
         binding.saveTodoButton.isEnabled = enable
         if (enable) {
-            binding.saveTodoButton.setTextColor(resources.getColor(R.color.c_1a1a1a))
+            binding.saveTodoButton.setTextColor(resources.getColor(R.color.primary_color))
         } else {
             binding.saveTodoButton.setTextColor(resources.getColor(R.color.c_999999))
         }

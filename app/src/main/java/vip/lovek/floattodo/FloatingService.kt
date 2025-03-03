@@ -13,7 +13,6 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
 import android.os.Vibrator
-import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -170,16 +169,14 @@ class FloatingService : Service() {
 //                }
                 loadFirstTodo()
             }
-        }, 0, TIME_UPDATE_INTERVAL)
+        }, 0, 10 * TIME_UPDATE_INTERVAL)
     }
 
     private fun loadFirstTodo() {
-        Log.d(TAG, "loadFirstTodo")
         val database = TodoDatabase.getDatabase(this)
         val todoDao = database.todoDao()
         CoroutineScope(Dispatchers.IO).launch {
             val todos = todoDao.getAllTodos()
-            Log.d(TAG, "loadFirstTodo ${todos.size}")
             if (todos.isNotEmpty()) {
                 withContext(Dispatchers.Main) {
                     floatingView.visibility = View.VISIBLE
@@ -208,22 +205,19 @@ class FloatingService : Service() {
 
     private fun startAnimation() {
         // 单次心跳动画的时长
-        val singleAnimationDuration = 500L
         // 计算 10 秒内动画的循环次数
-        val repeatCount = (VIBRATOR_DURATION / singleAnimationDuration - 1).toInt()
-
+        val repeatCount = (VIBRATOR_DURATION / TIME_UPDATE_INTERVAL - 1).toInt()
         // 创建心跳样式的动画
-        val scaleXAnimator = ObjectAnimator.ofFloat(floatingView, "scaleX", 1f, 1.2f, 1f)
-        val scaleYAnimator = ObjectAnimator.ofFloat(floatingView, "scaleY", 1f, 1.2f, 1f)
-        scaleXAnimator.duration = singleAnimationDuration
-        scaleYAnimator.duration = singleAnimationDuration
-        scaleXAnimator.repeatCount = repeatCount
-        scaleYAnimator.repeatCount = repeatCount
-        scaleXAnimator.repeatMode = ObjectAnimator.REVERSE
-        scaleYAnimator.repeatMode = ObjectAnimator.REVERSE
+        val currentWidth = clockTextView.width
+        // 定义目标宽度
+        val targetWidth = DisplayUtil.dp2px(ANIMATION_TEXT_WIDTH)
+        val textAnimator = ObjectAnimator.ofInt(clockTextView, "width", currentWidth, targetWidth)
+        textAnimator.duration = TIME_UPDATE_INTERVAL
         // 启动动画
-        scaleXAnimator.start()
-        scaleYAnimator.start()
+        textAnimator.start()
+        textAnimator.addUpdateListener {
+            clockTextView.requestLayout()
+        }
     }
 
     // 发送通知
@@ -269,11 +263,14 @@ class FloatingService : Service() {
 
     companion object {
         const val TAG = "FloatingService"
-        const val TIME_UPDATE_INTERVAL = 30 * 1000L
+        const val TIME_UPDATE_INTERVAL = 1000L
         const val FLOAT_MARGIN_BOTTOM = 360f
         const val VIBRATOR_DURATION = 10000
         const val CHANNEL_ID = "todo"
         const val NOTIFICATION_ID = 1
+
+        // 动画TextView宽度
+        const val ANIMATION_TEXT_WIDTH = 108f
 
         // 滑动阈值
         const val touchSlop = 16
