@@ -1,6 +1,8 @@
 package vip.lovek.floattodo
 
-import android.animation.ObjectAnimator
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -13,6 +15,7 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
 import android.os.Vibrator
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -38,6 +41,7 @@ class FloatingService : Service() {
     private lateinit var vibrator: Vibrator
     private lateinit var windowManager: WindowManager
     private lateinit var floatingView: View
+    private lateinit var deleteArea: View
     private lateinit var clockTextView: TextView
     private lateinit var closeButton: TextView
     private var timer: Timer? = null
@@ -81,7 +85,9 @@ class FloatingService : Service() {
 
     private fun initListener() {
         // 设置悬浮窗布局参数
-        val layoutParams = initFloatWindowManager()
+        val bottomLayoutParams = initFloatBottomView()
+        windowManager.addView(deleteArea, bottomLayoutParams)
+        val layoutParams = initFloatView()
         // 处理悬浮窗拖动事件
         floatingView.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
@@ -101,9 +107,13 @@ class FloatingService : Service() {
                     }
 
                     MotionEvent.ACTION_UP -> {
-                        if ((event.rawX - initialTouchX < touchSlop) && (event.rawY - initialTouchY < touchSlop) &&
-                            (System.currentTimeMillis() - actionDownTime < 300)
-                        ) {
+                        // 检查是否拖动到删除区域
+                        if (isInDeleteArea(event.rawY.toInt())) {
+                            stopSelf()
+                        }
+                        // 隐藏删除区域
+                        deleteArea.visibility = View.GONE
+                        if (currentIsClick(event, System.currentTimeMillis())) {
                             goMainActivity()
                         }
                         return true
@@ -113,14 +123,24 @@ class FloatingService : Service() {
                         layoutParams.x = initialX + (event.rawX - initialTouchX).toInt()
                         layoutParams.y = initialY + (event.rawY - initialTouchY).toInt()
                         windowManager.updateViewLayout(floatingView, layoutParams)
+                        if (!currentIsClick(event, System.currentTimeMillis())) {
+                            deleteArea.visibility = View.VISIBLE
+                        }
                         return true
                     }
                 }
                 return false
             }
+
+            private fun currentIsClick(event: MotionEvent, currentTimeMillis: Long): Boolean {
+               return (event.rawX - initialTouchX < touchSlop) && (event.rawY - initialTouchY < touchSlop) &&
+                        (currentTimeMillis - actionDownTime < 300)
+            }
         })
         // 添加悬浮窗到 WindowManager
         windowManager.addView(floatingView, layoutParams)
+        // 初始化隐藏删除区域
+        deleteArea.visibility = View.GONE
 
         // 设置关闭按钮点击事件监听器
         closeButton.setOnClickListener {
@@ -137,7 +157,13 @@ class FloatingService : Service() {
         startActivity(intent)
     }
 
-    private fun initFloatWindowManager(): WindowManager.LayoutParams {
+    private fun isInDeleteArea(y: Int): Boolean {
+        val bottomHeight = DisplayUtil.dp2px(BOTTOM_DELETE_HEIGHT)
+        val screenHeight = DisplayUtil.getServiceScreenHeight(applicationContext)
+        return y > screenHeight - bottomHeight
+    }
+
+    private fun initFloatView(): WindowManager.LayoutParams {
         val screenWidth = DisplayUtil.getServiceScreenWidth(applicationContext)
         val screenHeight = DisplayUtil.getServiceScreenHeight(applicationContext)
         val layoutParams =
@@ -156,6 +182,22 @@ class FloatingService : Service() {
         return layoutParams
     }
 
+    private fun initFloatBottomView(): WindowManager.LayoutParams {
+        // 加载删除区域布局
+        deleteArea = LayoutInflater.from(this).inflate(R.layout.floating_delete_area, null)
+        val bottomHeight = DisplayUtil.dp2px(BOTTOM_DELETE_HEIGHT)
+        val deleteParams = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                bottomHeight,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+            )
+        deleteParams.gravity = Gravity.BOTTOM
+        deleteParams.y = 0
+        return deleteParams
+    }
+
     private fun startClock() {
         timer = Timer()
         timer?.schedule(object : TimerTask() {
@@ -169,7 +211,7 @@ class FloatingService : Service() {
 //                }
                 loadFirstTodo()
             }
-        }, 0, 10 * TIME_UPDATE_INTERVAL)
+        }, 0, 30 * TIME_UPDATE_INTERVAL)
     }
 
     private fun loadFirstTodo() {
@@ -204,20 +246,33 @@ class FloatingService : Service() {
     }
 
     private fun startAnimation() {
-        // 单次心跳动画的时长
-        // 计算 10 秒内动画的循环次数
-        val repeatCount = (VIBRATOR_DURATION / TIME_UPDATE_INTERVAL - 1).toInt()
-        // 创建心跳样式的动画
-        val currentWidth = clockTextView.width
-        // 定义目标宽度
-        val targetWidth = DisplayUtil.dp2px(ANIMATION_TEXT_WIDTH)
-        val textAnimator = ObjectAnimator.ofInt(clockTextView, "width", currentWidth, targetWidth)
-        textAnimator.duration = TIME_UPDATE_INTERVAL
-        // 启动动画
-        textAnimator.start()
-        textAnimator.addUpdateListener {
-            clockTextView.requestLayout()
+        Log.e(TAG, "startAnimation()")
+        // 宽度动画
+        var elapsedTime = 0L
+        val textWidth = DisplayUtil.dp2px(ANIMATION_TEXT_WIDTH)
+        val targetWidth = (textWidth * 1.2).toInt()
+        val animator = ValueAnimator.ofInt(textWidth, targetWidth).apply {
+            duration = TIME_UPDATE_INTERVAL
+            addUpdateListener { animation ->
+                val value = animation.animatedValue as Int
+                val layoutParams = clockTextView.layoutParams
+                layoutParams.width = value
+                clockTextView.layoutParams = layoutParams
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    elapsedTime += TIME_UPDATE_INTERVAL
+                    if (elapsedTime < VIBRATOR_DURATION) {
+                        start()
+                    } else {
+                        val layoutParams = clockTextView.layoutParams
+                        layoutParams.width = textWidth
+                        clockTextView.layoutParams = layoutParams
+                    }
+                }
+            })
         }
+        animator.start()
     }
 
     // 发送通知
@@ -263,14 +318,15 @@ class FloatingService : Service() {
 
     companion object {
         const val TAG = "FloatingService"
+        const val VIBRATOR_DURATION = 20000
         const val TIME_UPDATE_INTERVAL = 1000L
         const val FLOAT_MARGIN_BOTTOM = 360f
-        const val VIBRATOR_DURATION = 10000
         const val CHANNEL_ID = "todo"
         const val NOTIFICATION_ID = 1
 
         // 动画TextView宽度
-        const val ANIMATION_TEXT_WIDTH = 108f
+        const val ANIMATION_TEXT_WIDTH = 90f
+        const val BOTTOM_DELETE_HEIGHT = 80f
 
         // 滑动阈值
         const val touchSlop = 16

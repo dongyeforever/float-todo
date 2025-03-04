@@ -11,4 +11,5 @@
     <color name="c_1a1a1a">#1a1a1a</color>
     <color name="dialog_toast_color">#90000000</color>
     <color name="edit_bottom_line">#E4E7EA</color>
+    <color name="bottom_delete">#F76260</color>
 </resources>
