@@ -164,7 +164,6 @@ class FloatingService : Service() {
     }
 
     private fun initFloatView(): WindowManager.LayoutParams {
-        val screenWidth = DisplayUtil.getServiceScreenWidth(applicationContext)
         val screenHeight = DisplayUtil.getServiceScreenHeight(applicationContext)
         val layoutParams =
             WindowManager.LayoutParams(
@@ -177,7 +176,7 @@ class FloatingService : Service() {
 
         // 设置悬浮窗位置
         layoutParams.gravity = Gravity.TOP or Gravity.START
-        layoutParams.x = screenWidth
+        layoutParams.x = 0
         layoutParams.y = screenHeight - DisplayUtil.dp2px(FLOAT_MARGIN_BOTTOM)
         return layoutParams
     }
@@ -211,7 +210,7 @@ class FloatingService : Service() {
 //                }
                 loadFirstTodo()
             }
-        }, 0, 30 * TIME_UPDATE_INTERVAL)
+        }, 0, 40 * TIME_UPDATE_INTERVAL)
     }
 
     private fun loadFirstTodo() {
@@ -246,7 +245,7 @@ class FloatingService : Service() {
     }
 
     private fun startAnimation() {
-        Log.e(TAG, "startAnimation()")
+        Log.d(TAG, "startAnimation()")
         // 宽度动画
         var elapsedTime = 0L
         val textWidth = DisplayUtil.dp2px(ANIMATION_TEXT_WIDTH)
