@@ -12,7 +12,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import vip.lovek.floattodo.databinding.ActivityEditTodoBinding
+import vip.lovek.floattodo.model.CommonConstants
 import vip.lovek.floattodo.model.Todo
+import vip.lovek.floattodo.util.NotificationUtil
 import java.util.Calendar
 
 class EditTodoActivity : AppCompatActivity() {
@@ -26,7 +28,7 @@ class EditTodoActivity : AppCompatActivity() {
         binding = ActivityEditTodoBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        todo = intent.getParcelableExtra(TodoViewHolder.INTENT_KEY_TODO) as? Todo
+        todo = intent.getParcelableExtra(CommonConstants.INTENT_KEY_TODO) as? Todo
         originTodo = todo?.copy()
         todo?.let {
             binding.todoTitleEditText.setText(it.title)
@@ -99,9 +101,6 @@ class EditTodoActivity : AppCompatActivity() {
                 reminderTime = selectedCalendar.timeInMillis
                 binding.tvSetReminder.text = formatToHourMinute(reminderTime)
                 setSaveEnable(hasTodoChanged())
-
-                setAlarm(reminderTime)
-                Toast.makeText(this, "提醒时间已设置，别忘了保存", Toast.LENGTH_SHORT).show()
             },
             hour,
             minute,
@@ -110,16 +109,20 @@ class EditTodoActivity : AppCompatActivity() {
         timePickerDialog.show()
     }
 
-    private fun setAlarm(time: Long) {
+    private fun setAlarm(todo: Todo) {
+        NotificationUtil.notificationTodoList.remove(todo.id)
         val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
         val intent = Intent(this, AlarmReceiver::class.java)
+        intent.putExtra(CommonConstants.INTENT_KEY_TODO_ID, todo.id)
+        intent.putExtra(CommonConstants.INTENT_KEY_TODO_TITLE, todo.title)
         val pendingIntent = PendingIntent.getBroadcast(
             this,
             0,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        alarmManager.set(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+        alarmManager.set(AlarmManager.RTC_WAKEUP, todo.reminderTime, pendingIntent)
+        Toast.makeText(this, "提醒时间已设置", Toast.LENGTH_SHORT).show()
     }
 
     private fun showBackDialog() {
@@ -169,8 +172,12 @@ class EditTodoActivity : AppCompatActivity() {
             reminderTime = reminderTime
         )
 
+
+        if (todo != null && todo!!.reminderTime != originTodo?.reminderTime) {
+            setAlarm(todo!!)
+        }
         val resultIntent = Intent()
-        resultIntent.putExtra("todo", todo)
+        resultIntent.putExtra(CommonConstants.INTENT_KEY_TODO, todo)
         setResult(RESULT_OK, resultIntent)
         finish()
     }

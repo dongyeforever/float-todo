@@ -5,8 +5,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.View
-import android.view.View.OnLongClickListener
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
@@ -19,6 +17,7 @@ import kotlinx.coroutines.withContext
 import vip.lovek.floattodo.dao.TodoDao
 import vip.lovek.floattodo.dao.TodoDatabase
 import vip.lovek.floattodo.databinding.ActivityMainBinding
+import vip.lovek.floattodo.model.CommonConstants
 import vip.lovek.floattodo.model.Todo
 
 class MainActivity : AppCompatActivity() {
@@ -52,6 +51,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.tvLogo.setOnClickListener {
             requestOverlayPermission()
+            requestBatteryPermission()
         }
 
         binding.tvLogo.setOnLongClickListener {
@@ -107,6 +107,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun requestBatteryPermission() {
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+        intent.data = Uri.parse("package:$packageName")
+        startActivity(intent)
+    }
+
     private fun showDeleteDialog() {
         val builder = AlertDialog.Builder(this)
         builder.setTitle("提示")
@@ -132,9 +138,9 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_TODO && resultCode == RESULT_OK) {
             val todo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                data?.getParcelableExtra(TodoViewHolder.INTENT_KEY_TODO, Todo::class.java)
+                data?.getParcelableExtra(CommonConstants.INTENT_KEY_TODO, Todo::class.java)
             } else {
-                data?.getParcelableExtra(TodoViewHolder.INTENT_KEY_TODO) as? Todo
+                data?.getParcelableExtra(CommonConstants.INTENT_KEY_TODO) as? Todo
             }
             todo?.let {
                 CoroutineScope(Dispatchers.IO).launch {

@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vip.lovek.floattodo.dao.TodoDao
 import vip.lovek.floattodo.dao.TodoDatabase
+import vip.lovek.floattodo.model.CommonConstants
 import vip.lovek.floattodo.model.Todo
 
 /**
@@ -70,7 +71,7 @@ class TodoViewHolder(private var mContext: Context, itemView: View) : RecyclerVi
 
     private fun onEditClicked() {
         val intent = Intent(mContext, EditTodoActivity::class.java)
-        intent.putExtra(INTENT_KEY_TODO, mTodo)
+        intent.putExtra(CommonConstants.INTENT_KEY_TODO, mTodo)
         (mContext as Activity).startActivityForResult(intent, 1)
     }
 
@@ -90,9 +91,5 @@ class TodoViewHolder(private var mContext: Context, itemView: View) : RecyclerVi
                 todoViewModel.getSortLiveData().value = true
             }
         }
-    }
-
-    companion object {
-        const val INTENT_KEY_TODO = "todo"
     }
 }

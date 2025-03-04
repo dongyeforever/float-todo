@@ -3,9 +3,6 @@ package vip.lovek.floattodo
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -22,7 +19,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
-import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,6 +27,7 @@ import vip.lovek.floattodo.dao.TodoDatabase
 import vip.lovek.floattodo.model.Todo
 import vip.lovek.floattodo.util.ActivityUtil
 import vip.lovek.floattodo.util.DisplayUtil
+import vip.lovek.floattodo.util.NotificationUtil
 import vip.lovek.floattodo.util.TimeUtils
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -47,6 +44,7 @@ class FloatingService : Service() {
     private var timer: Timer? = null
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneId.systemDefault())
     private var actionDownTime: Long = 0
+    private var lastTodo: Todo? = null
 
     // 广播
     private var broadcastReceiver: BroadcastReceiver = object : BroadcastReceiver() {
@@ -57,8 +55,14 @@ class FloatingService : Service() {
         }
     }
 
+    private var powerBroadcastReceiver: PowerReceiver = PowerReceiver()
+
     override fun onBind(intent: Intent?): IBinder? {
         return null
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return START_STICKY
     }
 
     override fun onCreate() {
@@ -75,11 +79,23 @@ class FloatingService : Service() {
         startClock()
         loadFirstTodo()
         // 广播
+        registerTodoBroadcast()
+        registerPowerBroadcast()
+    }
+
+    private fun registerPowerBroadcast() {
+        val intent = IntentFilter()
+        intent.addAction(Intent.ACTION_SCREEN_ON)
+        intent.addAction(Intent.ACTION_SCREEN_OFF)
+        registerReceiver(powerBroadcastReceiver, intent)
+    }
+
+    private fun registerTodoBroadcast() {
         val filter = IntentFilter(FLOAT_SERVICE_ACTION)
         registerReceiver(
             broadcastReceiver,
             filter,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Context.RECEIVER_NOT_EXPORTED else 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) RECEIVER_NOT_EXPORTED else 0
         )
     }
 
@@ -133,7 +149,7 @@ class FloatingService : Service() {
             }
 
             private fun currentIsClick(event: MotionEvent, currentTimeMillis: Long): Boolean {
-               return (event.rawX - initialTouchX < touchSlop) && (event.rawY - initialTouchY < touchSlop) &&
+                return (event.rawX - initialTouchX < touchSlop) && (event.rawY - initialTouchY < touchSlop) &&
                         (currentTimeMillis - actionDownTime < 300)
             }
         })
@@ -186,12 +202,12 @@ class FloatingService : Service() {
         deleteArea = LayoutInflater.from(this).inflate(R.layout.floating_delete_area, null)
         val bottomHeight = DisplayUtil.dp2px(BOTTOM_DELETE_HEIGHT)
         val deleteParams = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                bottomHeight,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT
-            )
+            WindowManager.LayoutParams.MATCH_PARENT,
+            bottomHeight,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        )
         deleteParams.gravity = Gravity.BOTTOM
         deleteParams.y = 0
         return deleteParams
@@ -221,19 +237,20 @@ class FloatingService : Service() {
             if (todos.isNotEmpty()) {
                 withContext(Dispatchers.Main) {
                     floatingView.visibility = View.VISIBLE
-                }
-                val todo = todos[0]
-                CoroutineScope(Dispatchers.Main).launch {
-                    if (todo.isCompleted) {
-                        floatingView.visibility = View.GONE
-                    } else {
-                        clockTextView.text = todo.title
-                        if (TimeUtils.isInCurrentMinute(todo.reminderTime)) {
-                            // 构造通知
-                            sendNotification(todo)
-                            // 动画提醒
-                            startAnimation()
+                    val todo = todos[0]
+                    if (todo != lastTodo) {
+                        if (todo.isCompleted) {
+                            floatingView.visibility = View.GONE
+                        } else {
+                            clockTextView.text = todo.title
+                            if (TimeUtils.isInCurrentMinute(todo.reminderTime)) {
+                                // 构造通知
+                                NotificationUtil.sendNotification(this@FloatingService, todo)
+                                // 动画提醒
+                                startAnimation()
+                            }
                         }
+                        lastTodo = todo
                     }
                 }
             } else {
@@ -274,37 +291,6 @@ class FloatingService : Service() {
         animator.start()
     }
 
-    // 发送通知
-    private fun sendNotification(todo: Todo) {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        // 创建一个 Intent 用于打开某个 Activity
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_ID, NotificationManager.IMPORTANCE_HIGH)
-        channel.setShowBadge(true)
-        notificationManager.createNotificationChannel(channel)
-
-        // 构建通知
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("您有代办需要现在处理")
-            .setContentText(todo.title)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .build()
-
-        // 发送通知
-        notificationManager.notify(NOTIFICATION_ID, notification)
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         // 移除悬浮窗
@@ -329,6 +315,8 @@ class FloatingService : Service() {
 
         // 滑动阈值
         const val touchSlop = 16
+
+        // 同步 to do 列表数据广播
         const val FLOAT_SERVICE_ACTION = "vip.lovek.floattodo.FLOAT_SERVICE_ACTION"
     }
 }
